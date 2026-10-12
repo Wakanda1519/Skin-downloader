@@ -4,8 +4,6 @@
 
 ![Go](https://img.shields.io/badge/Go-1.26%2B-00ADD8?style=flat-square&logo=go&logoColor=white)
 ![Windows](https://img.shields.io/badge/Windows-10%2B-0078D6?style=flat-square&logo=windows&logoColor=white)
-![SteamCMD](https://img.shields.io/badge/SteamCMD-252490-171A21?style=flat-square&logo=steam&logoColor=white)
-![Rust](https://img.shields.io/badge/Rust-Workshop-CE422B?style=flat-square&logo=rust&logoColor=white)
 
 ## Особенности
 
