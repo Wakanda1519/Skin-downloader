@@ -1,2 +1,42 @@
-# Skin-downloader
-A CLI utility for the Rust Devblog community that parses the contents of Rust.Workshop, groups skins by shortname, and downloads the entire skin pack using SteamCMD
+# 🎮 Skin downloader
+
+**CLI-утилита для Rust Devblog комьюнити, которая парсит содержимое Rust.Workshop, группирует скины по shortname и скачивает весь скинпак с помощью SteamCMD**
+
+![Go](https://img.shields.io/badge/Go-1.26%2B-00ADD8?style=flat-square&logo=go&logoColor=white)
+![Windows](https://img.shields.io/badge/Windows-10%2B-0078D6?style=flat-square&logo=windows&logoColor=white)
+![SteamCMD](https://img.shields.io/badge/SteamCMD-252490-171A21?style=flat-square&logo=steam&logoColor=white)
+![Rust](https://img.shields.io/badge/Rust-Workshop-CE422B?style=flat-square&logo=rust&logoColor=white)
+
+## Особенности
+
+* Автоматическая установка SteamCMD, если он не найден рядом или в PATH.
+* Докачка прерванной загрузки: уже скачанные скины пропускаются.
+* Параллельная загрузка в несколько воркеров SteamCMD и автоматические повторы ошибок.
+* Итоговая сверка с диском: предложит докачать недостающие или удалить их из итогового json.
+* Группировка скинов по shortname предметов в формате json.
+
+## Установка
+
+### Требования
+
+* Windows 10+
+* Go 1.26+
+* Декомпилированные исходники `Rust.Workshop.dll`.
+* SteamCMD отдельно ставить не нужно: утилита скачает его сама.
+
+### Сборка
+
+```
+go build -o Skindl.exe .
+```
+
+### Использование
+
+1. Создайте папку, перенесите туда Skindl.exe и запустите.
+2. Skindl.exe создаст папку source, туда надо перенести декомпилированные исходники `Rust.Workshop.dll`. В папке с игрой он хранится по пути `...\RustClient_Data\Managed\Rust.Workshop.dll`, для декомпиляции можно использовать `ILSpy` (Загружаете dll, ПКМ по ней в интерфейсе программы, кликаем "Save Code...", сохраняем в папку source), нажмите Enter
+3. Дальше программа сделает всё за вас, сначала сформирует файл Skins.json, потом начинает скачивать скины с Steam Workshop, в конце предложит повторить установку скинов с ошибкой или удалить их из json.
+
+## Что делать с полученными файлами?
+
+* Skins.json можно перенести в конфиг вашего плагина, который работает со скинами, к примеру XSkinMenu.
+* Можно модифицировать клиент, чтобы скины брались не из Steam, а из папки workshop, которая будет в директории игры.
