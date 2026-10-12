@@ -5,6 +5,8 @@
 ![Go](https://img.shields.io/badge/Go-1.26%2B-00ADD8?style=flat-square&logo=go&logoColor=white)
 ![Windows](https://img.shields.io/badge/Windows-10%2B-0078D6?style=flat-square&logo=windows&logoColor=white)
 
+<img width="1342" height="761" alt="oF7tUz0Myo7efHVmvRpEtG0vziZmC9zSF348XUj85Y6NwhMvKGnJS7H85cWaZBo0TXe3onKZLxmuV1khWfTYbwR2" src="https://github.com/user-attachments/assets/a1e49150-1794-4dbf-9380-cb3f1401520a" />
+
 ## Особенности
 
 * Автоматическая установка SteamCMD, если он не найден рядом или в PATH.
