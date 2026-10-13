@@ -1,6 +1,6 @@
 # 🎮 Skin downloader
 
-**CLI-утилита для Rust Devblog, которая парсит декомпилирует Rust.Workshop.dll с помощью ILSpyCMD, парсит класс Approved, группирует SkinID по Shortname и скачивает весь скинпак с помощью SteamCMD**
+**CLI-утилита для Rust Devblog комьюнити, которая декомпилирует Rust.Workshop.dll с помощью ILSpyCMD, парсит класс Approved, группирует SkinID по Shortname и скачивает весь скинпак с помощью SteamCMD**
 
 ![Go](https://img.shields.io/badge/Go-1.26%2B-00ADD8?style=flat-square&logo=go&logoColor=white)
 ![Windows](https://img.shields.io/badge/Windows-10%2B-0078D6?style=flat-square&logo=windows&logoColor=white)
