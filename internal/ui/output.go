@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"bufio"
 	"fmt"
 	"os"
 	"strings"
@@ -64,6 +65,15 @@ func Err(format string, args ...any) {
 
 func Note(format string, args ...any) {
 	fmt.Printf("  %s %s\n", paint(cDim, " "), paint(cDim, fmt.Sprintf(format, args...)))
+}
+
+func Pause() {
+	if !ownsConsole() {
+		return
+	}
+	fmt.Print(paint(cDim, "\nНажмите Enter, чтобы закрыть... "))
+	reader := bufio.NewReader(os.Stdin)
+	_, _ = reader.ReadString('\n')
 }
 
 type Progress struct {

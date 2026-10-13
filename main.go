@@ -13,25 +13,27 @@ import (
 	"strings"
 
 	"github.com/Wakanda1519/skindl/internal/approved"
+	"github.com/Wakanda1519/skindl/internal/ilspy"
 	"github.com/Wakanda1519/skindl/internal/steamcmd"
 	"github.com/Wakanda1519/skindl/internal/ui"
 )
 
 const (
-	sourceDirName   = "source"
-	approvedRelPath = "Rust.Workshop/Approved.cs"
-	workshopDirName = "workshop"
-	skinsJSONName   = "Skins.json"
-	failedFileName  = "failed.txt"
-	totalSteps      = 3
+	decompiledDirName  = "Rust.Workshop.csproj"
+	workshopDirName    = "workshop"
+	skinsJSONName      = "Skins.json"
+	shortNamesJSONName = "Shortname.json"
+	failedFileName     = "failed.txt"
+	totalSteps         = 4
 )
 
 func main() {
 	dir := flag.String("dir", "", "рабочая папка (по умолчанию текущая)")
 	steamcmdPath := flag.String("steamcmd", "", "путь к steamcmd.exe")
+	dllPath := flag.String("dll", "", "путь к Rust.Workshop.dll (по умолчанию ищется в рабочей папке)")
+	ilspyPath := flag.String("ilspycmd", "", "путь к ilspycmd (по умолчанию ищется в PATH)")
 	limit := flag.Int("limit", 0, "скачать только первые N скинов (0 = все)")
 	noDownload := flag.Bool("no-download", false, "только разобрать Approved.cs и создать skins.json")
-	yes := flag.Bool("yes", false, "не ждать Enter, считать исходники готовыми")
 	verbose := flag.Bool("verbose", false, "показывать сырой вывод steamcmd")
 	batch := flag.Int("batch", 8, "сколько скинов скачивать за один вызов steamcmd (меньше — прогресс обновляется чаще)")
 	jobs := flag.Int("jobs", 1, "число параллельных воркеров steamcmd (ускоряет скачивание)")
@@ -50,13 +52,40 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer stop()
 
-	ui.Step(1, totalSteps, "Подготовка папки source")
-	sourceDir := filepath.Join(baseDir, sourceDirName)
-	if err := os.MkdirAll(sourceDir, 0o755); err != nil {
-		fatal(err)
+	reader := bufio.NewReader(os.Stdin)
+
+	ui.Step(1, totalSteps, "Поиск Rust.Workshop.dll и декомпиляция")
+	dll, err := findWorkshopDll(baseDir, *dllPath)
+	if err != nil {
+		if *dllPath != "" {
+			fatal(err)
+		}
+		ui.Warn("%v", err)
+		dll = waitForDll(baseDir, reader)
 	}
-	ui.OK("готово: %s", sourceDir)
-	approvedPath := waitForSources(sourceDir, *yes)
+	ui.OK("найден %s", dll)
+
+	decompiledDir := filepath.Join(baseDir, decompiledDirName)
+	approvedPath, ok := findApproved(decompiledDir)
+	if ok && !sourceOutdated(dll, approvedPath) {
+		ui.OK("исходники уже готовы: %s", approvedPath)
+	} else {
+		if ok {
+			ui.Note("Rust.Workshop.dll новее исходников, декомпилируем заново")
+		}
+		tool, err := ilspy.Find(baseDir, *ilspyPath)
+		if err != nil {
+			fatal(err)
+		}
+		if err := tool.Decompile(ctx, dll, decompiledDir, *verbose); err != nil {
+			fatal(err)
+		}
+		approvedPath, ok = findApproved(decompiledDir)
+		if !ok {
+			fatal(fmt.Errorf("в %s не найден Approved.cs (неожиданный формат сборки?)", decompiledDir))
+		}
+		ui.OK("исходники: %s", approvedPath)
+	}
 	fmt.Println()
 
 	ui.Step(2, totalSteps, "Анализ Approved.cs")
@@ -74,8 +103,14 @@ func main() {
 	if err := approved.WriteJSON(jsonPath, groups); err != nil {
 		fatal(err)
 	}
+	shortNamesPath := filepath.Join(baseDir, shortNamesJSONName)
+	categories, err := approved.WriteShortNames(shortNamesPath, groups)
+	if err != nil {
+		fatal(err)
+	}
 	ui.OK("разобрано скинов: %d", len(skins))
 	ui.OK("создан %s  (предметов: %d)", jsonPath, len(groups))
+	ui.OK("создан %s  (категорий: %d)", shortNamesPath, categories)
 	fmt.Println()
 
 	if *noDownload {
@@ -84,9 +119,6 @@ func main() {
 	}
 
 	workshopDir := filepath.Join(baseDir, workshopDirName)
-	if err := os.MkdirAll(workshopDir, 0o755); err != nil {
-		fatal(err)
-	}
 
 	if *status {
 		_, already := steamcmd.FilterPending(workshopDir, ids)
@@ -110,67 +142,141 @@ func main() {
 		ui.OK("уже скачано: %d, к загрузке: %d", already, len(pending))
 	}
 
-	sc, err := steamcmd.Find(baseDir, *steamcmdPath)
-	if err != nil {
-		fatal(err)
-	}
-	ui.OK("steamcmd: %s", sc.Exe)
-	if sc.Fresh {
-		_ = sc.Bootstrap(ctx)
-	}
+	var (
+		finalPresent int
+		failedCount  int
+	)
 
-	if *jobs > 1 {
-		ui.Note("параллельный режим: воркеров steamcmd — %d", *jobs)
-	}
-	failed := runDownloads(ctx, sc, baseDir, workshopDir, pending, already, *verbose, *batch, *jobs, *retries)
-
-	if len(failed) > 0 {
-		failedPath := filepath.Join(baseDir, failedFileName)
-		if err := writeFailedList(failedPath, failed); err == nil {
-			ui.Warn("не скачалось скинов: %d; их ID записаны в %s", len(failed), failedPath)
+	if askStartDownload(reader) {
+		if err := os.MkdirAll(workshopDir, 0o755); err != nil {
+			fatal(err)
 		}
-	}
 
-	if ctx.Err() != nil {
-		ui.Warn("остановлено пользователем")
-	}
+		sc, err := steamcmd.Find(baseDir, *steamcmdPath)
+		if err != nil {
+			fatal(err)
+		}
+		ui.OK("steamcmd: %s", sc.Exe)
+		if sc.Fresh {
+			_ = sc.Bootstrap(ctx)
+		}
 
-	pruned := false
-	if ctx.Err() == nil {
-		reader := bufio.NewReader(os.Stdin)
-		missing, _ := steamcmd.FilterPending(workshopDir, ids)
-		for len(missing) > 0 && ctx.Err() == nil {
-			switch askFinalChoice(reader, len(missing)) {
-			case 1:
-				_ = runDownloads(ctx, sc, baseDir, workshopDir, missing, 0, *verbose, *batch, *jobs, *retries)
-				missing, _ = steamcmd.FilterPending(workshopDir, ids)
-			case 2:
-				remove := make(map[uint64]struct{}, len(missing))
-				for _, id := range missing {
-					remove[id] = struct{}{}
-				}
-				groups = approved.RemoveIDs(groups, remove)
-				if err := approved.WriteJSON(jsonPath, groups); err != nil {
-					fatal(err)
-				}
-				ui.OK("обновлён %s: убрано id — %d", jsonPath, len(missing))
-				pruned = true
-				missing = nil
-			default:
-				missing = nil
+		if *jobs > 1 {
+			ui.Note("параллельный режим: воркеров steamcmd — %d", *jobs)
+		}
+		failed := runDownloads(ctx, sc, baseDir, workshopDir, pending, already, *verbose, *batch, *jobs, *retries)
+
+		if len(failed) > 0 {
+			failedPath := filepath.Join(baseDir, failedFileName)
+			if err := writeFailedList(failedPath, failed); err == nil {
+				ui.Warn("не скачалось скинов: %d; их ID записаны в %s", len(failed), failedPath)
 			}
 		}
+
+		if ctx.Err() != nil {
+			ui.Warn("остановлено пользователем")
+		}
+
+		pruned := false
+		if ctx.Err() == nil {
+			missing, _ := steamcmd.FilterPending(workshopDir, ids)
+			for len(missing) > 0 && ctx.Err() == nil {
+				switch askFinalChoice(reader, len(missing)) {
+				case 1:
+					_ = runDownloads(ctx, sc, baseDir, workshopDir, missing, 0, *verbose, *batch, *jobs, *retries)
+					missing, _ = steamcmd.FilterPending(workshopDir, ids)
+				case 2:
+					remove := make(map[uint64]struct{}, len(missing))
+					for _, id := range missing {
+						remove[id] = struct{}{}
+					}
+					groups = approved.RemoveIDs(groups, remove)
+					if err := approved.WriteJSON(jsonPath, groups); err != nil {
+						fatal(err)
+					}
+					ui.OK("обновлён %s: убрано id — %d", jsonPath, len(missing))
+					pruned = true
+					missing = nil
+				default:
+					missing = nil
+				}
+			}
+		}
+
+		finalMissing, present := steamcmd.FilterPending(workshopDir, ids)
+		finalPresent = present
+		if len(finalMissing) > 0 && !pruned {
+			ui.Warn("по факту на диске не хватает скинов: %d (см. %s)", len(finalMissing), failedFileName)
+		}
+		failedCount = len(finalMissing)
+		if pruned {
+			failedCount = 0
+		}
+	} else {
+		ui.Note("установка скинов пропущена")
 	}
 
-	finalMissing, finalPresent := steamcmd.FilterPending(workshopDir, ids)
-	if len(finalMissing) > 0 && !pruned {
-		ui.Warn("по факту на диске не хватает скинов: %d (см. %s)", len(finalMissing), failedFileName)
-	}
-	failedCount := len(finalMissing)
-	if pruned {
-		failedCount = 0
-	}
+	ui.Step(4, totalSteps, "Удаление лишних файлов")
+	cleanup(reader, baseDir, decompiledDir, dll)
+
 	printSummary(baseDir, len(skins), len(groups), len(ids), finalPresent, failedCount)
+}
+
+func cleanup(reader *bufio.Reader, baseDir, decompiledDir, dllPath string) {
+	if askYesNo(reader, "Удалить декомпилированный исходник Rust.Workshop.dll (папка Rust.Workshop.csproj и сама dll)?") {
+		if err := os.RemoveAll(decompiledDir); err != nil {
+			ui.Warn("не удалось удалить %s: %v", decompiledDir, err)
+		}
+		if err := os.Remove(dllPath); err != nil && !os.IsNotExist(err) {
+			ui.Warn("не удалось удалить %s: %v", dllPath, err)
+		}
+		ui.OK("исходники и Rust.Workshop.dll удалены")
+	}
+
+	if askYesNo(reader, "Удалить steamcmd?") {
+		if err := removeSteamcmd(baseDir); err != nil {
+			ui.Warn("не удалось удалить steamcmd: %v", err)
+		} else {
+			ui.OK("steamcmd удалён")
+		}
+	}
+
+	if askYesNo(reader, "Удалить ilspy cli?") {
+		if err := ilspy.Remove(baseDir); err != nil {
+			ui.Warn("не удалось удалить ilspy cli: %v", err)
+		} else {
+			ui.OK("ilspy cli удалён")
+		}
+	}
+}
+
+func askYesNo(reader *bufio.Reader, question string) bool {
+	for {
+		fmt.Print(ui.Bold("  " + question + " (Y/N): "))
+		line, err := reader.ReadString('\n')
+		if err != nil {
+			fmt.Println()
+			return false
+		}
+		switch strings.ToLower(strings.TrimSpace(line)) {
+		case "y", "yes", "да":
+			return true
+		case "n", "no", "нет":
+			return false
+		default:
+			ui.Err("введите Y или N")
+		}
+	}
+}
+
+func removeSteamcmd(baseDir string) error {
+	var firstErr error
+	for _, name := range []string{"steamcmd", ".steamcmd", "steamcmd-workers"} {
+		if err := os.RemoveAll(filepath.Join(baseDir, name)); err != nil && firstErr == nil {
+			firstErr = err
+		}
+	}
+	return firstErr
 }
 
 func runDownloads(ctx context.Context, sc *steamcmd.Command, baseDir, workshopDir string, ids []uint64, already int, verbose bool, batch, jobs, retries int) []uint64 {
@@ -201,6 +307,31 @@ func runDownloads(ctx context.Context, sc *steamcmd.Command, baseDir, workshopDi
 		retryProgress.Finish()
 	}
 	return failed
+}
+
+func askStartDownload(reader *bufio.Reader) bool {
+	fmt.Println()
+	fmt.Println(ui.Bold("  Установка скинов"))
+	fmt.Println("  Y - начать установку скинов")
+	fmt.Println("  N - пропустить установку (перейти к удалению лишних файлов)")
+	fmt.Print(ui.Bold("  Ваш выбор (Y/N): "))
+
+	for {
+		line, err := reader.ReadString('\n')
+		if err != nil {
+			fmt.Println()
+			return false
+		}
+		switch strings.ToLower(strings.TrimSpace(line)) {
+		case "y", "yes", "да":
+			return true
+		case "n", "no", "нет":
+			return false
+		default:
+			ui.Err("введите Y или N")
+			fmt.Print(ui.Bold("  Ваш выбор (Y/N): "))
+		}
+	}
 }
 
 func askFinalChoice(reader *bufio.Reader, missing int) int {
@@ -238,23 +369,42 @@ func resolveBaseDir(dir string) (string, error) {
 	return filepath.Abs(dir)
 }
 
-func waitForSources(sourceDir string, skipWait bool) string {
-	expected := filepath.Join(sourceDir, filepath.FromSlash(approvedRelPath))
-
-	if skipWait {
-		if p, ok := findApproved(sourceDir); ok {
-			ui.Note("используется %s", p)
-			return p
+func findWorkshopDll(baseDir, override string) (string, error) {
+	const name = "Rust.Workshop.dll"
+	if override != "" {
+		path := override
+		if !filepath.IsAbs(path) {
+			path = filepath.Join(baseDir, path)
 		}
-		fatal(fmt.Errorf("исходники не готовы: %s не найден", expected))
+		abs, err := filepath.Abs(path)
+		if err != nil {
+			return "", err
+		}
+		if st, err := os.Stat(abs); err != nil || st.IsDir() {
+			return "", fmt.Errorf("файл не найден по пути %s", abs)
+		}
+		return abs, nil
 	}
 
-	ui.Note("Ищем декомпилированные исходники по пути:")
-	fmt.Printf("    %s\n\n", ui.Cyan(expected))
-	ui.Note("Положите результат декомпиляции Rust.Workshop в папку:")
-	fmt.Printf("    %s\n\n", ui.Cyan(sourceDir))
+	entries, err := os.ReadDir(baseDir)
+	if err != nil {
+		return "", err
+	}
+	for _, e := range entries {
+		if e.IsDir() {
+			continue
+		}
+		if strings.EqualFold(e.Name(), name) {
+			return filepath.Join(baseDir, e.Name()), nil
+		}
+	}
+	return "", fmt.Errorf("в папке %s не найден %s", baseDir, name)
+}
 
-	reader := bufio.NewReader(os.Stdin)
+func waitForDll(baseDir string, reader *bufio.Reader) string {
+	ui.Note("Положите %s в эту же директорию", ui.Cyan("Rust.Workshop.dll"))
+	fmt.Println()
+
 	for {
 		fmt.Print(ui.Bold("Нажмите Enter, когда файл будет на месте... "))
 		if _, err := reader.ReadString('\n'); err != nil {
@@ -262,24 +412,27 @@ func waitForSources(sourceDir string, skipWait bool) string {
 		}
 		fmt.Println()
 
-		p, ok := findApproved(sourceDir)
-		if ok {
-			if !strings.EqualFold(p, expected) {
-				ui.Note("используется %s", p)
-			}
-			ui.OK("найден %s", filepath.Base(p))
-			return p
+		dll, err := findWorkshopDll(baseDir, "")
+		if err == nil {
+			return dll
 		}
-		ui.Warn("пока не найден, ожидается: %s", expected)
+		ui.Warn("%v", err)
 	}
 }
 
-func findApproved(sourceDir string) (string, bool) {
-	expected := filepath.Join(sourceDir, filepath.FromSlash(approvedRelPath))
-	if st, err := os.Stat(expected); err == nil && !st.IsDir() {
-		return expected, true
+func sourceOutdated(dll, approved string) bool {
+	di, err := os.Stat(dll)
+	if err != nil {
+		return false
 	}
+	ai, err := os.Stat(approved)
+	if err != nil {
+		return true
+	}
+	return di.ModTime().After(ai.ModTime())
+}
 
+func findApproved(sourceDir string) (string, bool) {
 	var matches []string
 	_ = filepath.WalkDir(sourceDir, func(path string, d os.DirEntry, err error) error {
 		if err != nil || d.IsDir() {
@@ -337,5 +490,6 @@ func printSummary(baseDir string, skins, items, ids, ok, failed int) {
 
 func fatal(err error) {
 	ui.Err("%v", err)
+	ui.Pause()
 	os.Exit(1)
 }

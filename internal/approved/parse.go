@@ -86,7 +86,7 @@ var shortNames = map[string]string{
 	"riot helmet":           "riot.helmet",
 	"crossbow":              "crossbow",
 	"python":                "pistol.python",
-	"sheet metal door":      "door.metal",
+	"sheet metal door":      "door.hinged.metal",
 	"ak47":                  "rifle.ak",
 	"sleeping bag":          "sleepingbag",
 	"furnace":               "furnace",
@@ -95,8 +95,8 @@ var shortNames = map[string]string{
 	"water purifier":        "water.purifier",
 	"large wood box":        "box.wooden.large",
 	"hunting bow":           "bow.hunting",
-	"stone pick axe":        "pickaxe.stone",
-	"stone hatchet":         "hatchet.stone",
+	"stone pick axe":        "stone.pickaxe",
+	"stone hatchet":         "stonehatchet",
 	"revolver":              "pistol.revolver",
 	"vending machine":       "vending.machine",
 	"hatchet":               "hatchet",
@@ -104,9 +104,9 @@ var shortNames = map[string]string{
 	"thompson":              "smg.thompson",
 	"metal chest plate":     "metal.plate.torso",
 	"metal facemask":        "metal.facemask",
-	"cap":                   "cap",
-	"boonie hat":            "boonie.hat",
-	"burlap pants":          "burlap.pants",
+	"cap":                   "hat.cap",
+	"boonie hat":            "hat.boonie",
+	"burlap pants":          "burlap.trousers",
 	"burlap shirt":          "burlap.shirt",
 	"fridge":                "fridge",
 	"pump shotgun":          "shotgun.pump",
@@ -115,39 +115,39 @@ var shortNames = map[string]string{
 	"rock":                  "rock",
 	"rug":                   "rug",
 	"m39":                   "rifle.m39",
-	"wooden door":           "door.wood",
+	"wooden door":           "door.hinged.wood",
 	"m249":                  "lmg.m249",
 	"semi-automatic pistol": "pistol.semiauto",
 	"hammer":                "hammer",
 	"satchel charge":        "explosive.satchel",
-	"bandana":               "bandana",
+	"bandana":               "mask.bandana",
 	"burlap headwrap":       "burlap.headwrap",
 	"mp5":                   "smg.mp5",
 	"waterpipe shotgun":     "shotgun.waterpipe",
-	"armored door":          "door.metal.armored",
+	"armored door":          "door.hinged.toptier",
 	"double barrel shotgun": "shotgun.double",
 	"wood storage box":      "box.wooden",
 	"rocket launcher":       "rocket.launcher",
-	"sword":                 "sword",
+	"sword":                 "salvaged.sword",
 	"work boots":            "shoes.boots",
-	"leather gloves":        "gloves.leather",
+	"leather gloves":        "burlap.gloves",
 	"bone club":             "bone.club",
 	"long tshirt":           "tshirt.long",
-	"shorts":                "shorts",
+	"shorts":                "pants.shorts",
 	"tshirt":                "tshirt",
 	"eoka pistol":           "pistol.eoka",
 	"locker":                "locker",
 	"hide pants":            "attire.hide.pants",
 	"hide shirt":            "attire.hide.vest",
 	"hide poncho":           "attire.hide.poncho",
-	"vagabond jacket":       "jacket.vagabond",
+	"vagabond jacket":       "jacket",
 	"salvaged icepick":      "icepick.salvaged",
 	"bone knife":            "knife.bone",
 	"chair":                 "chair",
 	"hide shoes":            "attire.hide.boots",
 	"longsword":             "longsword",
 	"bucket helmet":         "bucket.helmet",
-	"balaclava":             "balaclava",
+	"balaclava":             "mask.balaclava",
 	"f1 grenade":            "grenade.f1",
 	"concrete barricade":    "barricade.concrete",
 	"snow jacket":           "jacket.snow",
@@ -157,13 +157,60 @@ var shortNames = map[string]string{
 	"collared shirt":        "shirt.collared",
 	"deer skull mask":       "deer.skull.mask",
 	"bearskin rug":          "rug.bear",
-	"acoustic guitar":       "guitar.acoustic",
-	"hide halterneck":       "attire.hide.halterneck",
+	"acoustic guitar":       "fun.guitar",
+	"hide halterneck":       "attire.hide.helterneck",
 	"hide skirt":            "attire.hide.skirt",
 	"reactive target":       "target.reactive",
 	"sandbag barricade":     "barricade.sandbags",
 	"beenie hat":            "hat.beenie",
 	"tank top":              "shirt.tanktop",
+}
+
+var categoryOrder = []string{"weapon", "construction", "item", "attire", "tool"}
+
+var shortNameCategory = func() map[string]string {
+	m := make(map[string]string)
+	add := func(category string, names ...string) {
+		for _, name := range names {
+			m[name] = category
+		}
+	}
+	add("weapon",
+		"bone.club", "bow.hunting", "crossbow", "grenade.f1", "knife.bone", "knife.combat",
+		"lmg.m249", "longsword", "pistol.eoka", "pistol.python", "pistol.revolver", "pistol.semiauto",
+		"rifle.ak", "rifle.bolt", "rifle.lr300", "rifle.m39", "rifle.semiauto", "rocket.launcher",
+		"salvaged.sword", "shotgun.double", "shotgun.pump", "shotgun.waterpipe", "smg.2", "smg.mp5",
+		"smg.thompson",
+	)
+	add("construction",
+		"barricade.concrete", "barricade.sandbags", "door.hinged.metal", "door.hinged.toptier",
+		"door.hinged.wood", "wall.frame.garagedoor",
+	)
+	add("item",
+		"box.wooden", "box.wooden.large", "chair", "fridge", "furnace", "locker", "rug", "rug.bear",
+		"sleepingbag", "table", "target.reactive", "vending.machine", "water.purifier",
+	)
+	add("attire",
+		"attire.hide.boots", "attire.hide.helterneck", "attire.hide.pants", "attire.hide.poncho",
+		"attire.hide.skirt", "attire.hide.vest", "bucket.helmet", "burlap.gloves", "burlap.headwrap",
+		"burlap.shirt", "burlap.shoes", "burlap.trousers", "coffeecan.helmet", "deer.skull.mask",
+		"hat.beenie", "hat.boonie", "hat.cap", "hat.miner", "hoodie", "jacket", "jacket.snow",
+		"mask.balaclava", "mask.bandana", "metal.facemask", "metal.plate.torso", "pants", "pants.shorts",
+		"riot.helmet", "roadsign.jacket", "roadsign.kilt", "shirt.collared", "shirt.tanktop",
+		"shoes.boots", "tshirt", "tshirt.long",
+	)
+	add("tool",
+		"explosive.satchel", "hammer", "hatchet", "icepick.salvaged", "pickaxe", "rock",
+		"stone.pickaxe", "stonehatchet",
+	)
+	return m
+}()
+
+func Category(shortName string) string {
+	if c, ok := shortNameCategory[shortName]; ok {
+		return c
+	}
+	return "item"
 }
 
 func ShortName(itemName string) string {
@@ -249,4 +296,53 @@ func WriteJSON(path string, groups []ItemGroup) error {
 	}
 	b.WriteString("}\n")
 	return os.WriteFile(path, []byte(b.String()), 0o644)
+}
+
+func WriteShortNames(path string, groups []ItemGroup) (int, error) {
+	byCategory := make(map[string][]string)
+	seen := make(map[string]struct{}, len(groups))
+	for _, g := range groups {
+		if _, ok := seen[g.Name]; ok {
+			continue
+		}
+		seen[g.Name] = struct{}{}
+		cat := Category(g.Name)
+		byCategory[cat] = append(byCategory[cat], g.Name)
+	}
+
+	var categories []string
+	for _, c := range categoryOrder {
+		if len(byCategory[c]) > 0 {
+			categories = append(categories, c)
+		}
+	}
+
+	var b strings.Builder
+	b.WriteString("{\n")
+	for ci, c := range categories {
+		key, err := json.Marshal(c)
+		if err != nil {
+			return 0, err
+		}
+		fmt.Fprintf(&b, "  %s: [\n", key)
+		names := byCategory[c]
+		for ni, name := range names {
+			val, err := json.Marshal(name)
+			if err != nil {
+				return 0, err
+			}
+			fmt.Fprintf(&b, "    %s", val)
+			if ni < len(names)-1 {
+				b.WriteString(",")
+			}
+			b.WriteString("\n")
+		}
+		b.WriteString("  ]")
+		if ci < len(categories)-1 {
+			b.WriteString(",")
+		}
+		b.WriteString("\n")
+	}
+	b.WriteString("}\n")
+	return len(categories), os.WriteFile(path, []byte(b.String()), 0o644)
 }

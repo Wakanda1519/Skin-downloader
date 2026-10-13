@@ -8,9 +8,10 @@ import (
 )
 
 var (
-	kernel32           = syscall.NewLazyDLL("kernel32.dll")
-	procGetConsoleMode = kernel32.NewProc("GetConsoleMode")
-	procSetConsoleMode = kernel32.NewProc("SetConsoleMode")
+	kernel32                  = syscall.NewLazyDLL("kernel32.dll")
+	procGetConsoleMode        = kernel32.NewProc("GetConsoleMode")
+	procSetConsoleMode        = kernel32.NewProc("SetConsoleMode")
+	procGetConsoleProcessList = kernel32.NewProc("GetConsoleProcessList")
 )
 
 const enableVirtualTerminalProcessing = 0x0004
@@ -28,4 +29,10 @@ func enableVirtualTerminal() {
 		}
 		procSetConsoleMode.Call(uintptr(h), uintptr(mode|enableVirtualTerminalProcessing))
 	}
+}
+
+func ownsConsole() bool {
+	var pids [4]uint32
+	r, _, _ := procGetConsoleProcessList.Call(uintptr(unsafe.Pointer(&pids[0])), uintptr(len(pids)))
+	return r == 1
 }
