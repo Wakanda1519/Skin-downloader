@@ -26,7 +26,7 @@
 
 * Go 1.26+
 * Windows 10+
-* `Rust.Workshop.dll` (в папке с игрой лежит по пути `...\RustClient_Data\Managed\Rust.Workshop.dll`).
+* `Rust.Workshop.dll` (лежит в папке с Rust по пути `...\RustClient_Data\Managed\Rust.Workshop.dll`).
 
 ### Сборка
 
