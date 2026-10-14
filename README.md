@@ -24,8 +24,8 @@
 
 ### Требования
 
-* Windows 10+
 * Go 1.26+
+* Windows 10+
 * `Rust.Workshop.dll` (в папке с игрой лежит по пути `...\RustClient_Data\Managed\Rust.Workshop.dll`).
 
 ### Сборка
