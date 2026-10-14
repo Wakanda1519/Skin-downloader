@@ -26,7 +26,6 @@
 
 * Windows 10+
 * Go 1.26+
-* ILSpyCMD и SteamCMD отдельно ставить не нужно: утилита скачает их сама.
 * `Rust.Workshop.dll` (в папке с игрой лежит по пути `...\RustClient_Data\Managed\Rust.Workshop.dll`).
 
 ### Сборка
