@@ -39,7 +39,7 @@ go build -o Skindl.exe .
 1. Создайте папку, перенесите туда `Skindl.exe` и положите рядом `Rust.Workshop.dll` (из папки с игрой `...\RustClient_Data\Managed\`). Запустите.
 2. `Skindl.exe` найдёт `Rust.Workshop.dll`, декомпилирует его через `ilspycmd` в папку `Rust.Workshop.csproj` и найдёт там `Approved.cs`.
 3. Дальше программа сделает всё за вас: сформирует `Skins.json` и `Shortname.json`, затем спросит, начинать ли установку скинов, в конце предложит повторить установку скинов с ошибкой или удалить их из json.
-4. Последний шаг предложит удалить лишние файлы: декомпилированный исходник `Rust.Workshop.csproj` вместе с `Rust.Workshop.dll`, SteamCMD и ILSpy CLI.
+4. Последний шаг предложит удалить лишние файлы: декомпилированный исходник `Rust.Workshop.csproj` вместе с `Rust.Workshop.dll`, SteamCMD и ILSpy CLI, оставив только итоговый результат.
 
 ## Вопрос - ответ
 
